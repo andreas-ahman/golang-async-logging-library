@@ -43,8 +43,7 @@ func New(w io.Writer) *Alog {
 // the caller from being blocked.
 func (al Alog) Start() {
 	for {
-		message := <-al.msgCh
-		al.write(message, nil)
+		go al.write(<-al.msgCh, nil)
 	}
 }
 
@@ -58,25 +57,29 @@ func (al Alog) formatMessage(msg string) string {
 func (al Alog) write(msg string, wg *sync.WaitGroup) {
 	message := al.formatMessage(msg)
 	al.m.Lock()
-	_, err := al.dest.Write([]byte(message))
-	if err != nil {
+
+	defer func() {
+		al.m.Unlock()
+	}()
+
+	if _, err := al.dest.Write([]byte(message)); err != nil {
 		go func() { al.errorCh <- err }()
 	}
-	al.m.Unlock()
+
 }
 
 func (al Alog) shutdown() {
 }
 
 // MessageChannel returns a channel that accepts messages that should be written to the log.
-func (al Alog) MessageChannel() chan string {
+func (al Alog) MessageChannel() chan<- string {
 	return al.msgCh
 }
 
 // ErrorChannel returns a channel that will be populated when an error is raised during a write operation.
 // This channel should always be monitored in some way to prevent deadlock goroutines from being generated
 // when errors occur.
-func (al Alog) ErrorChannel() chan error {
+func (al Alog) ErrorChannel() <-chan error {
 	return al.errorCh
 }
 
