@@ -78,7 +78,7 @@ func (al Alog) write(msg string, wg *sync.WaitGroup) {
 	}()
 
 	if _, err := al.dest.Write([]byte(message)); err != nil {
-		al.errorCh <- err
+		go func() { al.errorCh <- err }()
 	}
 	wg.Done()
 
